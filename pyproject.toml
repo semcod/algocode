@@ -1,0 +1,29 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "algocode"
+version = "0.1.0"
+description = "Algorithmic Code & Backlog Analysis Engine with NL-DSL-LLM Architecture and MCP Server"
+readme = "README.md"
+authors = [
+    { name = "Tom Softreck", email = "tom@sapletta.com" }
+]
+license = { text = "Apache-2.0" }
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8.0.0",
+]
+
+[project.scripts]
+algocode = "algocode.cli:main"
+
+[tool.wellmanifest]
+standard = "0.20.32"
+adopts = [
+    "wellmanifest/nl-dsl-llm@0.1.0"
+]
