@@ -27,3 +27,10 @@ htmlcov/
 .cache/
 .subactor/cache/
 *.tmp
+
+# koru runtime artefacts (generated)
+.planfile/
+.koru/
+koru.yaml
+.cursor/
+

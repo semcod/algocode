@@ -27,6 +27,53 @@ class CodeAnalysisEngine:
     # 1. Algorithmic Duplicate & Structural Clone Detection
     # ---------------------------------------------------------------------------
 
+    # Language keyword sets for polyglot structural normalization
+    LANGUAGE_KEYWORDS: Dict[str, Set[str]] = {
+        "js": {
+            "break", "case", "catch", "class", "const", "continue", "debugger", "default",
+            "delete", "do", "else", "export", "extends", "finally", "for", "function",
+            "if", "import", "in", "instanceof", "new", "return", "super", "switch",
+            "this", "throw", "try", "typeof", "var", "void", "while", "with", "yield",
+            "let", "static", "enum", "await", "async", "type", "interface", "implements",
+            "private", "protected", "public", "readonly", "as", "from", "of", "null", "undefined", "true", "false",
+        },
+        "go": {
+            "break", "default", "func", "interface", "select", "case", "defer", "go",
+            "map", "struct", "chan", "else", "goto", "package", "switch", "const",
+            "fallthrough", "if", "range", "type", "continue", "for", "import", "return", "var",
+            "nil", "true", "false", "iota",
+        },
+        "rust": {
+            "as", "break", "const", "continue", "crate", "else", "enum", "extern",
+            "false", "fn", "for", "if", "impl", "in", "let", "loop", "match", "mod",
+            "move", "mut", "pub", "ref", "return", "self", "Self", "static", "struct",
+            "super", "trait", "true", "type", "unsafe", "use", "where", "while", "async", "await", "dyn",
+        },
+        "php": {
+            "__halt_compiler", "abstract", "and", "array", "as", "break", "callable", "case",
+            "catch", "class", "clone", "const", "continue", "declare", "default", "die",
+            "do", "echo", "else", "elseif", "empty", "enddeclare", "endfor", "endforeach",
+            "endif", "endswitch", "endwhile", "eval", "exit", "extends", "final", "finally",
+            "fn", "for", "foreach", "function", "global", "goto", "if", "implements",
+            "include", "include_once", "instanceof", "insteadof", "interface", "isset",
+            "list", "match", "namespace", "new", "or", "print", "private", "protected",
+            "public", "readonly", "require", "require_once", "return", "static", "switch",
+            "throw", "trait", "try", "unset", "use", "var", "while", "xor", "yield", "null", "true", "false",
+        }
+    }
+
+    SUFFIX_TO_LANG: Dict[str, str] = {
+        ".js": "js",
+        ".jsx": "js",
+        ".ts": "js",
+        ".tsx": "js",
+        ".mjs": "js",
+        ".cjs": "js",
+        ".go": "go",
+        ".rs": "rust",
+        ".php": "php",
+    }
+
     @staticmethod
     def _normalize_line(line: str) -> str:
         """Strips whitespace and trailing comments."""
@@ -34,6 +81,82 @@ class CodeAnalysisEngine:
         if line.startswith("#") or line.startswith("//"):
             return ""
         return re.sub(r"\s+", " ", line)
+
+    @classmethod
+    def _extract_brace_blocks(cls, content: str, min_lines: int) -> List[Tuple[int, int, str]]:
+        """
+        Extracts function/method blocks bounded by braces { ... } in C-family languages
+        (JS/TS, Go, Rust, PHP, Java, etc.).
+        Returns a list of (start_line, end_line, raw_snippet).
+        """
+        blocks: List[Tuple[int, int, str]] = []
+        lines = content.splitlines()
+        n = len(lines)
+        i = 0
+        while i < n:
+            line = lines[i]
+            stripped = line.strip()
+            if stripped.startswith("//") or stripped.startswith("/*") or stripped.startswith("*") or stripped.startswith("#"):
+                i += 1
+                continue
+
+            is_fn_sig = ("{" in line) and (
+                any(kw in line for kw in ("function", "func", "fn", "=>", "class ", "interface ", "struct "))
+                or (stripped.endswith("{") and "(" in line)
+            )
+            if is_fn_sig:
+                start_line = i + 1
+                brace_count = line.count("{") - line.count("}")
+                block_lines = [line]
+                j = i + 1
+                while j < n and brace_count > 0:
+                    curr = lines[j]
+                    brace_count += curr.count("{") - curr.count("}")
+                    block_lines.append(curr)
+                    j += 1
+                if brace_count == 0 and len(block_lines) >= min_lines:
+                    blocks.append((start_line, j, "\n".join(block_lines)))
+                    i = j
+                    continue
+            i += 1
+        return blocks
+
+    @classmethod
+    def _structural_normalize_generic(cls, code_snippet: str, keywords: Set[str]) -> str:
+        """
+        Normalizes generic language code (JS/TS, Go, Rust, PHP),
+        abstracting variable/function identifiers to generic tokens (_v1, _v2),
+        literals to _str / _num, while preserving language keywords and operators.
+        """
+        # Strip comments
+        code = re.sub(r"/\*.*?\*/", "", code_snippet, flags=re.DOTALL)
+        code = re.sub(r"//.*$", "", code, flags=re.MULTILINE)
+        code = re.sub(r"#.*$", "", code, flags=re.MULTILINE)
+
+        # Replace string literals
+        code = re.sub(r"\"(?:\\.|[^\"\\])*\"", " _str ", code)
+        code = re.sub(r"\'(?:\\.|[^\'\\])*\'", " _str ", code)
+        code = re.sub(r"`(?:\\.|[^`\\])*`", " _str ", code, flags=re.DOTALL)
+
+        # Replace numeric literals
+        code = re.sub(r"\b\d+(?:\.\d+)?\b", " _num ", code)
+
+        # Tokenize identifiers vs keywords
+        var_map: Dict[str, str] = {}
+        counter = 0
+
+        def replace_ident(match: re.Match) -> str:
+            nonlocal counter
+            token = match.group(0)
+            if token in keywords or token in ("_str", "_num"):
+                return token
+            if token not in var_map:
+                counter += 1
+                var_map[token] = f"_v{counter}"
+            return var_map[token]
+
+        code = re.sub(r"\b[a-zA-Z_$][a-zA-Z0-9_$]*\b", replace_ident, code)
+        return re.sub(r"\s+", " ", code).strip()
 
     @classmethod
     def _structural_normalize_python(cls, code_snippet: str) -> Optional[str]:
@@ -101,7 +224,7 @@ class CodeAnalysisEngine:
             return []
 
         if extensions is None:
-            extensions = [".py", ".sh", ".js", ".ts", ".json"]
+            extensions = [".py", ".sh", ".js", ".ts", ".jsx", ".tsx", ".go", ".rs", ".php", ".json"]
 
         file_paths: List[Path] = []
         if root.is_file():
@@ -158,6 +281,20 @@ class CodeAnalysisEngine:
                                 if norm_fn:
                                     s_key = hashlib.sha256(norm_fn.encode("utf-8")).hexdigest()
                                     structural_blocks.setdefault(s_key, []).append((rel_file, node.lineno, end_line, fn_code))
+                except Exception:
+                    pass
+
+            # Function-level structural clone detection for polyglot languages (JS, TS, Go, Rust, PHP)
+            lang = self.SUFFIX_TO_LANG.get(file_path.suffix)
+            if lang and lang in self.LANGUAGE_KEYWORDS:
+                try:
+                    keywords = self.LANGUAGE_KEYWORDS[lang]
+                    brace_blocks = self._extract_brace_blocks(content, min_lines=min_lines)
+                    for start_l, end_l, fn_code in brace_blocks:
+                        norm_fn = self._structural_normalize_generic(fn_code, keywords)
+                        if norm_fn:
+                            s_key = hashlib.sha256(norm_fn.encode("utf-8")).hexdigest()
+                            structural_blocks.setdefault(s_key, []).append((rel_file, start_l, end_l, fn_code))
                 except Exception:
                     pass
 

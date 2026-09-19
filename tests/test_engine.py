@@ -122,6 +122,99 @@ async def fetch_data():
         self.assertIn("os", res["imports"])
         self.assertIn("pathlib.Path", res["imports"])
 
+    def test_polyglot_structural_clone_typescript(self):
+        """Verify structural clone detection across TypeScript files."""
+        f1 = self.root / "orders.ts"
+        f2 = self.root / "invoices.ts"
+
+        code1 = """
+function calculateOrderTotal(items: number[]): number {
+    let sum = 0;
+    for (const item of items) {
+        sum += item * 2;
+    }
+    return sum;
+}
+"""
+        code2 = """
+function aggregateInvoicePrices(entries: number[]): number {
+    let result = 0;
+    for (const entry of entries) {
+        result += entry * 2;
+    }
+    return result;
+}
+"""
+        f1.write_text(code1, encoding="utf-8")
+        f2.write_text(code2, encoding="utf-8")
+
+        clones = self.engine.scan_duplicates(target_path=str(self.root), min_lines=5)
+        self.assertGreaterEqual(len(clones), 1)
+        clone_types = {c["clone_type"] for c in clones}
+        self.assertIn("structural", clone_types)
+
+    def test_polyglot_structural_clone_golang(self):
+        """Verify structural clone detection across Go files."""
+        f1 = self.root / "math1.go"
+        f2 = self.root / "math2.go"
+
+        code1 = """
+func computeTotal(vals []int) int {
+    total := 0
+    for _, val := range vals {
+        total += val * 2
+    }
+    return total
+}
+"""
+        code2 = """
+func aggregateNumbers(entries []int) int {
+    res := 0
+    for _, entry := range entries {
+        res += entry * 2
+    }
+    return res
+}
+"""
+        f1.write_text(code1, encoding="utf-8")
+        f2.write_text(code2, encoding="utf-8")
+
+        clones = self.engine.scan_duplicates(target_path=str(self.root), min_lines=5)
+        self.assertGreaterEqual(len(clones), 1)
+        clone_types = {c["clone_type"] for c in clones}
+        self.assertIn("structural", clone_types)
+
+    def test_polyglot_structural_clone_rust(self):
+        """Verify structural clone detection across Rust files."""
+        f1 = self.root / "calc1.rs"
+        f2 = self.root / "calc2.rs"
+
+        code1 = """
+fn calculate_sum(data: &[i32]) -> i32 {
+    let mut total = 0;
+    for x in data {
+        total += x * 2;
+    }
+    total
+}
+"""
+        code2 = """
+fn aggregate_numbers(records: &[i32]) -> i32 {
+    let mut accumulator = 0;
+    for r in records {
+        accumulator += r * 2;
+    }
+    accumulator
+}
+"""
+        f1.write_text(code1, encoding="utf-8")
+        f2.write_text(code2, encoding="utf-8")
+
+        clones = self.engine.scan_duplicates(target_path=str(self.root), min_lines=5)
+        self.assertGreaterEqual(len(clones), 1)
+        clone_types = {c["clone_type"] for c in clones}
+        self.assertIn("structural", clone_types)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -2,6 +2,18 @@
 
 All notable changes to `algocode` will be documented in this file.
 
+## [0.2.0] - 2026-09-19
+
+### Added
+- Polyglot structural clone detection (Type-2 AST normalization):
+  - TypeScript & JavaScript (`.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.cjs`).
+  - Go (`.go`).
+  - Rust (`.rs`).
+  - PHP (`.php`).
+- Brace block extractor `_extract_brace_blocks` with brace balance tracking for C-family function/method spans.
+- Universal structural normalizer `_structural_normalize_generic` abstracting identifiers to generic tokens (`_v1`, `_v2`) and literals to `_str`/`_num` while preserving language-specific keywords.
+- Unit test coverage for polyglot structural clone detection in TypeScript, Go, and Rust (17 unit tests passing).
+
 ## [0.1.0] - 2026-09-18
 
 ### Added
