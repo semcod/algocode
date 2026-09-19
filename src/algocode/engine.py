@@ -621,3 +621,41 @@ class CodeAnalysisEngine:
                 "import_count": len(imports)
             }
         }
+
+
+# ---------------------------------------------------------------------------
+# Module-level convenience functions
+# ---------------------------------------------------------------------------
+
+def check_conflict(manifest_path: Any = None, repo_root: Any = None, **kwargs) -> Dict[str, Any]:
+    """Convenience module-level conflict checker."""
+    path = str(repo_root) if repo_root else (str(Path(manifest_path).parent.parent) if manifest_path else ".")
+    engine = CodeAnalysisEngine()
+    conflicts = engine.check_conflicts(repo_path=path)
+    return {
+        "has_conflict": len(conflicts) > 0,
+        "conflicts": conflicts,
+        "conflict_count": len(conflicts),
+        "blocking": any(c.get("severity") == "BLOCKING" for c in conflicts),
+    }
+
+
+def check_conflicts(*args, **kwargs) -> List[Dict[str, Any]]:
+    """Convenience module-level function returning raw conflicts list."""
+    return CodeAnalysisEngine().check_conflicts(*args, **kwargs)
+
+
+def scan_duplicates(*args, **kwargs) -> List[Dict[str, Any]]:
+    """Convenience module-level function for duplicate scanning."""
+    return CodeAnalysisEngine().scan_duplicates(*args, **kwargs)
+
+
+def triage_issues(*args, **kwargs) -> List[Dict[str, Any]]:
+    """Convenience module-level function for issue triage."""
+    return CodeAnalysisEngine().triage_issues(*args, **kwargs)
+
+
+def inspect_ast(*args, **kwargs) -> Dict[str, Any]:
+    """Convenience module-level function for AST inspection."""
+    return CodeAnalysisEngine().inspect_ast(*args, **kwargs)
+
