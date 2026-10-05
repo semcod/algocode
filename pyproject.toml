@@ -22,8 +22,15 @@ test = [
 [project.scripts]
 algocode = "algocode.cli:main"
 
+[tool.hatch.build.targets.wheel]
+packages = ["src/algocode"]
+
 [tool.wellmanifest]
 standard = "0.20.32"
 adopts = [
     "wellmanifest/nl-dsl-llm@0.1.0"
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
