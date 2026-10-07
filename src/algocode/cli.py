@@ -14,6 +14,15 @@ from algocode.nl_dsl_llm import InterfaceAdapters, NLDSLLLMBridge
 
 
 def main(argv: Optional[List[str]] = None) -> int:
+    try:
+        from .autoupdate import check_for_updates
+        check_for_updates("algocode")
+    except Exception:
+        try:
+            from algocode.autoupdate import check_for_updates
+            check_for_updates("algocode")
+        except Exception:
+            pass
     parser = argparse.ArgumentParser(
         description="algocode: Algorithmic Code & Backlog Analysis Engine with NL-DSL-LLM & MCP"
     )
